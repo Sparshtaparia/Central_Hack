@@ -1,3 +1,6 @@
+# Environment variables
+.env
+
 # Logs
 logs
 *.log
@@ -7,9 +10,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment variables
-.env
-.env.*
+
 
 node_modules
 dist
