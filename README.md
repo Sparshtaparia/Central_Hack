@@ -1,73 +1,152 @@
-# Welcome to your Lovable project
+# 🎓 Rural Roots Finance  
+### AI-Powered Financial Learning Platform
 
-## Project info
+Rural Roots Finance is a **gamified financial education platform** designed to make financial literacy accessible, engaging, and practical for students and first-time learners.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+The platform delivers structured learning through **YouTube-powered video lessons**, interactive quizzes, XP-based progression, and streak-based motivation.
 
-## How can I edit this code?
+Inspired by platforms like **Duolingo, Khan Academy, and Coursera**, Rural Roots Finance transforms financial concepts into a:
 
-There are several ways of editing your application.
+> Course → Module → Lesson → Quiz → XP → Level Up
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🚀 Key Features
 
-Changes made via Lovable will be committed automatically to this repo.
+### 1. Structured Learning System
 
-**Use your preferred IDE**
+Each lesson maps to **one YouTube video** followed by a quiz.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 2. YouTube Playlist Integration
+YouTube playlists are converted into individual lessons.
 
-Follow these steps:
+Example:
+Playlist
+├─ Video 1 → Lesson 1: What is Money?
+├─ Video 2 → Lesson 2: Why Saving Matters
+└─ Video 3 → Lesson 3: Needs vs Wants
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 3. Gamification Engine
+- XP rewards per lesson  
+- Level system based on XP  
+- Daily learning streaks  
+- Progress bars per module  
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+### 4. Interactive Quiz System
+- MCQ based quizzes  
+- Instant feedback  
+- Score calculation  
+- Required for XP unlock  
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 5. User Progress Tracking
+Tracks:
+- Completed lessons  
+- Quiz scores  
+- XP earned  
+- Daily activity streak  
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🧠 System Architecture
+Frontend (React + Tailwind)
+↓
+Supabase (Postgres + Auth)
+↓
+YouTube Embed API
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## 🗄️ Database Schema
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### courses
+| Field | Type |
+|------|------|
+| id | uuid |
+| title | text |
+| description | text |
+| category | text |
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### modules
+| Field | Type |
+|------|------|
+| id | uuid |
+| course_id | uuid |
+| title | text |
+| order_index | int |
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+### lessons
+| Field | Type |
+|------|------|
+| id | uuid |
+| module_id | uuid |
+| title | text |
+| video_url | text |
+| xp_reward | int |
+| order_index | int |
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### quizzes
+| Field | Type |
+|------|------|
+| id | uuid |
+| lesson_id | uuid |
+| questions | jsonb |
+
+---
+
+### user_progress
+| Field | Type |
+|------|------|
+| user_id | uuid |
+| lesson_id | uuid |
+| completed | boolean |
+| score | int |
+| xp_earned | int |
+| completed_at | timestamp |
+
+---
+
+## 🎯 Lesson Flow (Core UX)
+
+1. User selects a course  
+2. Opens a module  
+3. Clicks a lesson  
+4. YouTube video plays  
+5. Quiz appears  
+6. XP awarded  
+7. Progress saved  
+
+---
+
+## 🔧 Tech Stack
+
+| Layer | Technology |
+|------|-----------|
+| Frontend | React + TypeScript |
+| Styling | Tailwind CSS |
+| Animations | Framer Motion |
+| Backend | Supabase (Postgres + Auth) |
+| Video | YouTube Embed |
+| UI Components | ShadCN UI |
+| Icons | Lucide |
+| Notifications | Sonner |
+
+---
+
+## 🧩 How Lessons Are Created
+
+Lessons are generated from YouTube playlists.
+
