@@ -3,9 +3,12 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import VideoPlayer from "@/components/VideoPlayer";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle, Zap, Play } from "lucide-react";
+import { ArrowLeft, CheckCircle, Zap, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+const PASSING_SCORE = 70; // 70% required to pass
 
 export default function LessonPage() {
   const { lessonId } = useParams();
@@ -17,14 +20,34 @@ export default function LessonPage() {
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [videoWatched, setVideoWatched] = useState(false);
 
   useEffect(() => {
     if (!lessonId) return;
-    supabase.from("lessons").select("*").eq("id", lessonId).single().then(({ data }) => setLesson(data));
-    supabase.from("quizzes").select("*").eq("lesson_id", lessonId).single().then(({ data }) => setQuiz(data));
+    supabase
+      .from("lessons")
+      .select("*")
+      .eq("id", lessonId)
+      .single()
+      .then(({ data }) => setLesson(data));
+
+    supabase
+      .from("quizzes")
+      .select("*")
+      .eq("lesson_id", lessonId)
+      .single()
+      .then(({ data }) => setQuiz(data));
+
     if (user) {
-      supabase.from("user_progress").select("*").eq("lesson_id", lessonId).eq("user_id", user.id).single()
-        .then(({ data }) => { if (data?.completed) setCompleted(true); });
+      supabase
+        .from("user_progress")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .eq("user_id", user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.completed) setCompleted(true);
+        });
     }
   }, [lessonId, user]);
 
@@ -44,104 +67,253 @@ export default function LessonPage() {
     setScore(pct);
     setSubmitted(true);
 
-    // Record progress & award XP
-    const xpEarned = lesson?.xp_reward || 10;
-    await supabase.from("user_progress").upsert({
-      user_id: user.id,
-      lesson_id: lessonId!,
-      completed: true,
-      completed_at: new Date().toISOString(),
-      score: pct,
-      xp_earned: xpEarned,
-    }, { onConflict: "user_id,lesson_id" });
+    // Check if passing score
+    if (pct >= PASSING_SCORE) {
+      // Record progress & award XP
+      const xpEarned = lesson?.xp_reward || 10;
+      await supabase.from("user_progress").upsert(
+        {
+          user_id: user.id,
+          lesson_id: lessonId!,
+          completed: true,
+          completed_at: new Date().toISOString(),
+          score: pct,
+          xp_earned: xpEarned,
+        },
+        { onConflict: "user_id,lesson_id" }
+      );
 
-    // Update profile XP
-    const { data: profile } = await supabase.from("profiles").select("xp, level, streak, last_active").eq("user_id", user.id).single();
+      // Update profile XP
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("xp, level, streak, last_active")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile) {
+        const newXp = (profile.xp || 0) + xpEarned;
+        const newLevel = Math.floor(newXp / 100) + 1;
+        const today = new Date().toISOString().slice(0, 10);
+        const lastActive = profile.last_active;
+        const yesterday = new Date(Date.now() - 86400000)
+          .toISOString()
+          .slice(0, 10);
+        let newStreak = profile.streak || 0;
+        if (lastActive === yesterday) newStreak += 1;
+        else if (lastActive !== today) newStreak = 1;
+
+        await supabase
+          .from("profiles")
+          .update({
+            xp: newXp,
+            level: newLevel,
+            streak: newStreak,
+            last_active: today,
+          })
+          .eq("user_id", user.id);
+      }
+
+      setCompleted(true);
+      toast.success(`Passed! +${xpEarned} XP earned!`);
+    } else {
+      toast.error(`Score ${pct}%. Need ${PASSING_SCORE}% to pass.`);
+    }
+  };
+
+  const handleRetry = () => {
+    setAnswers({});
+    setSubmitted(false);
+    setScore(0);
+  };
+
+  const handleMarkComplete = async () => {
+    if (!user) return;
+    const xpEarned = lesson.xp_reward || 10;
+    await supabase.from("user_progress").upsert(
+      {
+        user_id: user.id,
+        lesson_id: lessonId!,
+        completed: true,
+        completed_at: new Date().toISOString(),
+        xp_earned: xpEarned,
+      },
+      { onConflict: "user_id,lesson_id" }
+    );
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("xp, level, streak, last_active")
+      .eq("user_id", user.id)
+      .single();
+
     if (profile) {
       const newXp = (profile.xp || 0) + xpEarned;
       const newLevel = Math.floor(newXp / 100) + 1;
       const today = new Date().toISOString().slice(0, 10);
       const lastActive = profile.last_active;
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86400000)
+        .toISOString()
+        .slice(0, 10);
       let newStreak = profile.streak || 0;
       if (lastActive === yesterday) newStreak += 1;
       else if (lastActive !== today) newStreak = 1;
 
-      await supabase.from("profiles").update({
-        xp: newXp,
-        level: newLevel,
-        streak: newStreak,
-        last_active: today,
-      }).eq("user_id", user.id);
+      await supabase
+        .from("profiles")
+        .update({
+          xp: newXp,
+          level: newLevel,
+          streak: newStreak,
+          last_active: today,
+        })
+        .eq("user_id", user.id);
     }
 
     setCompleted(true);
-    toast.success(`🎉 +${xpEarned} XP earned!`);
+    toast.success(`Completed! +${xpEarned} XP earned!`);
   };
 
-  if (!lesson) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
+  if (!lesson) return <div className="text-center py-12">Loading...</div>;
 
   const ytId = getYouTubeId(lesson.video_url || "");
   const questions = (quiz?.questions as any[]) || [];
+  const answered = Object.keys(answers).length;
+  const allAnswered = answered === questions.length;
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
-      <Link to={-1 as any} className="flex items-center gap-2 text-muted-foreground mb-4 hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm font-semibold">Back</span>
-      </Link>
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Header */}
+      <div>
+        <Link
+          to="/app/academy"
+          className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-4 font-semibold"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to Academy
+        </Link>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <h1 className="text-xl font-extrabold text-foreground mb-1">{lesson.title}</h1>
-        <div className="flex items-center gap-2 mb-4">
-          <Zap className="w-4 h-4 text-xp" />
-          <span className="text-sm font-bold text-xp">+{lesson.xp_reward} XP</span>
-          {completed && <CheckCircle className="w-4 h-4 text-primary ml-2" />}
-        </div>
-
-        {/* Video Player */}
-        {ytId && (
-          <div className="rounded-2xl overflow-hidden border border-border mb-6 aspect-video bg-foreground/5">
-            <iframe
-              src={`https://www.youtube.com/embed/${ytId}?rel=0`}
-              title={lesson.title}
-              className="w-full h-full"
-              allowFullScreen
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            />
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">{lesson.title}</h1>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              {completed && (
+                <div className="flex items-center gap-1 text-primary font-semibold">
+                  <CheckCircle className="w-5 h-5" />
+                  Completed
+                </div>
+              )}
+            </div>
           </div>
-        )}
 
-        {/* Transcript */}
-        {lesson.transcript_en && (
-          <details className="rounded-xl border border-border bg-card p-4 mb-6">
-            <summary className="font-bold text-sm text-foreground cursor-pointer">📝 Transcript</summary>
-            <p className="text-sm text-muted-foreground mt-3 whitespace-pre-wrap">{lesson.transcript_en}</p>
-          </details>
-        )}
+          {!completed && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-lg border border-primary/20"
+            >
+              <Zap className="w-5 h-5 text-primary" />
+              <span className="font-bold text-primary">+{lesson.xp_reward} XP</span>
+            </motion.div>
+          )}
+        </div>
+      </div>
 
-        {/* Quiz */}
-        {questions.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="font-pixel text-lg text-foreground">Quiz Time! 🧠</h2>
+      {/* Video Player */}
+      {ytId && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-2"
+        >
+          <VideoPlayer youtubeId={ytId} title={lesson.title} />
+          <p className="text-xs text-muted-foreground">
+            Watch the video to learn the concept
+          </p>
+        </motion.div>
+      )}
+
+      {/* Transcript */}
+      {lesson.transcript_en && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-muted/50 p-6 rounded-lg border border-border"
+        >
+          <h3 className="font-bold mb-3 flex items-center gap-2">
+            📝 Transcript
+          </h3>
+          <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+            {lesson.transcript_en}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Quiz */}
+      {questions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6 bg-card p-6 rounded-lg border border-border"
+        >
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Quiz Time</h2>
+            <p className="text-sm text-muted-foreground">
+              Answer {questions.length} questions correctly to pass. You need at least {PASSING_SCORE}%
+            </p>
+          </div>
+
+          {/* Progress */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-semibold">
+              <span>Progress</span>
+              <span>
+                {answered}/{questions.length}
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${(answered / questions.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Questions */}
+          <div className="space-y-6">
             {questions.map((q: any, qi: number) => (
-              <div key={qi} className="rounded-xl border border-border bg-card p-4">
-                <p className="font-bold text-sm text-foreground mb-3">{qi + 1}. {q.question}</p>
+              <motion.div
+                key={qi}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: qi * 0.05 }}
+                className="space-y-3"
+              >
+                <h3 className="font-semibold text-sm">
+                  <span className="text-primary">Q{qi + 1}.</span> {q.question}
+                </h3>
+
                 <div className="space-y-2">
                   {(q.options as string[]).map((opt: string, oi: number) => {
                     const selected = answers[qi] === oi;
                     const isCorrect = submitted && oi === q.correct;
-                    const isWrong = submitted && selected && oi !== q.correct;
+                    const isWrong =
+                      submitted && selected && oi !== q.correct;
+
                     return (
                       <button
                         key={oi}
+                        onClick={() =>
+                          !submitted &&
+                          setAnswers({ ...answers, [qi]: oi })
+                        }
                         disabled={submitted}
-                        onClick={() => setAnswers({ ...answers, [qi]: oi })}
-                        className={`w-full text-left p-3 rounded-lg text-sm font-semibold transition-colors border-2 ${
-                          isCorrect ? "border-primary bg-primary/10 text-primary" :
-                          isWrong ? "border-destructive bg-destructive/10 text-destructive" :
-                          selected ? "border-primary bg-primary/5" :
-                          "border-border hover:bg-muted"
+                        className={`w-full text-left p-3 rounded-lg text-sm font-semibold transition-all border-2 cursor-pointer ${
+                          isCorrect
+                            ? "border-green-500 bg-green-500/10 text-green-600"
+                            : isWrong
+                            ? "border-red-500 bg-red-500/10 text-red-600"
+                            : selected
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:bg-muted"
                         }`}
                       >
                         {opt}
@@ -149,57 +321,91 @@ export default function LessonPage() {
                     );
                   })}
                 </div>
-              </div>
-            ))}
-
-            {!submitted ? (
-              <Button
-                onClick={handleSubmitQuiz}
-                disabled={Object.keys(answers).length < questions.length}
-                className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold shadow-warm"
-              >
-                Submit Quiz
-              </Button>
-            ) : (
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="rounded-xl bg-primary/10 border-2 border-primary p-6 text-center"
-              >
-                <p className="font-pixel text-2xl text-primary mb-1">{score}%</p>
-                <p className="text-sm text-muted-foreground">+{lesson.xp_reward} XP earned!</p>
               </motion.div>
-            )}
+            ))}
           </div>
-        )}
 
-        {/* Complete without quiz */}
-        {questions.length === 0 && !completed && (
+          {/* Submit/Results */}
+          {!submitted ? (
+            <Button
+              onClick={handleSubmitQuiz}
+              disabled={!allAnswered}
+              className="w-full h-12 text-base font-bold"
+            >
+              Submit Quiz
+            </Button>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`space-y-4 p-6 rounded-lg border-2 ${
+                score >= PASSING_SCORE
+                  ? "bg-green-500/10 border-green-500/30"
+                  : "bg-red-500/10 border-red-500/30"
+              }`}
+            >
+              <div className="text-center">
+                <div className="text-5xl font-bold mb-2">
+                  <span
+                    className={
+                      score >= PASSING_SCORE
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {score}%
+                  </span>
+                </div>
+                {score >= PASSING_SCORE ? (
+                  <div className="space-y-1">
+                    <p className="font-bold text-lg text-green-600">
+                      Congratulations! You passed!
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      +{lesson.xp_reward} XP earned
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="font-bold text-lg text-red-600">
+                      Almost there! Need {PASSING_SCORE}% to pass
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      You got {score}%. Try again!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {score < PASSING_SCORE && (
+                <Button
+                  onClick={handleRetry}
+                  variant="outline"
+                  className="w-full h-11"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Try Again
+                </Button>
+              )}
+            </motion.div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Complete without quiz */}
+      {questions.length === 0 && !completed && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <Button
-            onClick={async () => {
-              if (!user) return;
-              const xpEarned = lesson.xp_reward || 10;
-              await supabase.from("user_progress").upsert({
-                user_id: user.id, lesson_id: lessonId!, completed: true,
-                completed_at: new Date().toISOString(), xp_earned: xpEarned,
-              }, { onConflict: "user_id,lesson_id" });
-              const { data: profile } = await supabase.from("profiles").select("xp, level").eq("user_id", user.id).single();
-              if (profile) {
-                await supabase.from("profiles").update({
-                  xp: (profile.xp || 0) + xpEarned,
-                  level: Math.floor(((profile.xp || 0) + xpEarned) / 100) + 1,
-                  last_active: new Date().toISOString().slice(0, 10),
-                }).eq("user_id", user.id);
-              }
-              setCompleted(true);
-              toast.success(`🎉 +${xpEarned} XP earned!`);
-            }}
-            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold shadow-warm"
+            onClick={handleMarkComplete}
+            className="w-full h-12 text-base font-bold"
           >
-            <CheckCircle className="w-5 h-5 mr-2" /> Mark as Complete
+            Mark as Complete
           </Button>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }
