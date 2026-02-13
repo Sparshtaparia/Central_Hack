@@ -15,7 +15,30 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <header className="relative overflow-hidden">
+      <header className="relative min-h-screen flex items-center justify-center overflow-hidden">
+  {/* Background video */}
+  <video
+    autoPlay
+    muted
+    loop
+    playsInline
+    className="absolute inset-0 w-full h-full object-cover"
+  >
+    <source src="/src/assets/hero.mp4" type="video/mp4" />
+  </video>
+
+  {/* Dark overlay for readability */}
+  <div className="absolute inset-0 bg-black/40" />
+
+  {/* Content */}
+  <div className="relative z-10 max-w-lg mx-auto px-6 text-center">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+    
+
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background" />
         <div className="relative max-w-lg mx-auto px-6 pt-12 pb-8 text-center">
           <motion.div
@@ -54,7 +77,9 @@ export default function Index() {
             </div>
           </motion.div>
         </div>
-      </header>
+        </motion.div>
+  </div>
+</header>
 
       {/* Features */}
       <section className="max-w-lg mx-auto px-6 py-10">
