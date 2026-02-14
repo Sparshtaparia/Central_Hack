@@ -142,7 +142,7 @@ export default function AdminLessons() {
               <Input placeholder="Lesson title" value={lessonForm.title} onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })} className="rounded-xl" />
               <Select value={lessonForm.unit_id} onValueChange={(v) => setLessonForm({ ...lessonForm, unit_id: v })}>
                 <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select unit" /></SelectTrigger>
-                <SelectContent>{units.map(u => <SelectItem key={u.id} value={u.id}>{u.title}</SelectItem>)}</SelectContent>
+                <SelectContent portal={true}>{units.map(u => <SelectItem key={u.id} value={u.id}>{u.title}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={lessonForm.type} onValueChange={(v) => setLessonForm({ ...lessonForm, type: v })}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
