@@ -32,7 +32,8 @@ export default function AdminCourses() {
       if (error) { toast.error(error.message); return; }
       toast.success("Course updated");
     } else {
-      const { error } = await supabase.from("courses").insert(form);
+      // Automatically set is_published to true for new courses so they appear in Academy
+      const { error } = await supabase.from("courses").insert({ ...form, is_published: true });
       if (error) { toast.error(error.message); return; }
       toast.success("Course created");
     }
